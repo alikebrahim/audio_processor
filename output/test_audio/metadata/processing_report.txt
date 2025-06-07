@@ -1,0 +1,32 @@
+🎧 Audio Processing Report
+==================================================
+
+📁 Source File:
+   Name: test_audio.wav
+   Size: 18.3MB
+   Duration: 1m 6.8s
+
+⚙️  Processing:
+   Start: 2025-06-07T21:10:40.523068
+   Duration: 0.18s
+   Speed: 373.0x realtime
+
+🔇 Silence Analysis:
+   Segments found: 0
+   Total silence: 0.0s
+   Silence percentage: 0.0%
+
+📊 Output Chunks:
+   Total chunks: 2
+   Output duration: 2m 13.6s
+   Retention: 200.0%
+   Chunk details:
+      0. 00:00.000 - 01:06.785 (1m 6.8s) → test_audio_full_16k.flac
+      1. 00:00.000 - 01:06.785 (1m 6.8s) → test_audio_chunk01_16k.flac
+
+📈 Summary:
+   Input: 1m 6.8s
+   Output: 2m 13.6s
+   Removed: 0.0s
+   Compression: 200.0%
+   Speed: 373.0x realtime

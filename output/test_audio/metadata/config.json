@@ -1,0 +1,11 @@
+{
+  "sample_rate": 22050,
+  "chunk_duration": 30.0,
+  "silence_threshold": 0.01,
+  "min_silence_duration": 25.0,
+  "min_chunk_duration": 5.0,
+  "keep_silence": 1.0,
+  "output_format": "flac",
+  "create_metadata": true,
+  "preserve_timestamps": true
+}
