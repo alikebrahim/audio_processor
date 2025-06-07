@@ -612,11 +612,11 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Process all audio files with full features
-    process_audio_files_enhanced(
+    process_audio_files(
         input_dir, 
         output_dir,
         create_metadata=True,
-        output_format='wav'
+        output_format='flac'
     )
 
 

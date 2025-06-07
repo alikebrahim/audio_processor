@@ -212,12 +212,15 @@ class MultiFormatExporter:
     
     SUPPORTED_FORMATS = {
         'wav': {'ext': '.wav', 'subtype': 'PCM_16'},
-        'flac': {'ext': '.flac', 'subtype': 'PCM_16'},
+        'flac': {'ext': '.flac', 'requires_ffmpeg': True, 'optimized': True},
         'mp3': {'ext': '.mp3', 'requires_ffmpeg': True}
     }
     
-    def __init__(self, sample_rate: int = 22050):
+    def __init__(self, sample_rate: int = 22050, target_sample_rate: int = 16000, 
+                 flac_compression_level: int = 8):
         self.sample_rate = sample_rate
+        self.target_sample_rate = target_sample_rate
+        self.flac_compression_level = flac_compression_level
     
     def export_chunk(self, audio_data: np.ndarray, output_file: Path, 
                     format_type: str = 'wav', quality: str = 'high') -> bool:
@@ -230,8 +233,10 @@ class MultiFormatExporter:
             
             if format_type == 'mp3':
                 return self._export_mp3(audio_data, output_file, quality)
+            elif format_type == 'flac' and format_info.get('optimized', False):
+                return self._export_flac_optimized(audio_data, output_file)
             else:
-                # Use soundfile for WAV and FLAC
+                # Use soundfile for WAV and legacy FLAC
                 sf.write(str(output_file), audio_data, self.sample_rate, 
                         subtype=format_info['subtype'])
                 return True
