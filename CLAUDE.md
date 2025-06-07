@@ -22,7 +22,7 @@ This is an audio processing tool that splits monologue audio recordings (contain
 - **silence_thresh**: -40dB - amplitude threshold for silence detection
 - **keep_silence**: 1000ms (1 second) - silence preserved at chunk boundaries
 - **min_chunk_duration**: 5000ms (5 seconds) - chunks shorter than this are discarded
-- **output_format**: WAV files for consistency
+- **output_format**: FLAC files optimized for speech transcription (16kHz, 16-bit, mono)
 
 ## Development Commands
 
@@ -30,23 +30,38 @@ This is an audio processing tool that splits monologue audio recordings (contain
 # Install dependencies
 uv sync
 
-# Run the audio splitter
-uv run python run.py
+# Enhanced CLI with Typer (recommended)
+uv run python audio_splitter_typer.py --help
+uv run python audio_splitter_typer.py process --interactive
+uv run python audio_splitter_typer.py optimize input.wav --output optimized.flac
 
-# Direct execution
-uv run python audio_splitter.py
+# Legacy interfaces
+uv run python run.py                    # Simple batch processor
+uv run python audio_splitter_cli.py     # Argparse CLI
 ```
 
 ## Supported Audio Formats
 
 Input: MP3, WAV, M4A, FLAC, OGG, AAC, MP4
-Output: WAV format (standardized)
+Output: FLAC format (optimized for speech transcription)
 
 ## Dependencies
 
-- **PyDub**: Audio processing and silence detection
+### Core Processing
+- **Librosa**: Advanced audio analysis and processing engine
+- **SoundFile**: Audio I/O operations
+- **NumPy**: Numerical operations for audio data
+- **FFmpeg**: System dependency for optimal FLAC conversion
+
+### CLI and User Interface
+- **Typer**: Modern CLI framework with rich features
+- **Rich**: Beautiful terminal output and progress bars
+- **Pydantic**: Configuration validation and type safety
+- **PyYAML**: Configuration file support
+
+### Monitoring and Progress
 - **tqdm**: Progress bars for batch processing
-- **FFmpeg**: Required system dependency for various audio format support
+- **psutil**: Memory usage monitoring
 
 ## Processing Workflow
 
@@ -54,29 +69,59 @@ Output: WAV format (standardized)
 2. **Audio Loading**: Load files using PyDub with timing and size reporting
 3. **Silence Analysis**: Detect silence gaps using split_on_silence()
 4. **Chunk Filtering**: Remove chunks shorter than 5 seconds
-5. **Export**: Save valid chunks as numbered WAV files in subdirectories
+5. **FLAC Optimization**: Convert using FFmpeg to 16kHz, 16-bit, mono FLAC
+6. **Export**: Save optimized files with metadata in organized subdirectories
 
 ## Output Structure
 
 ```
 output/
 ├── audio_file1/
-│   ├── split01.wav
-│   ├── split02.wav
-│   └── ...
+│   ├── metadata/
+│   │   ├── processing_metadata.json
+│   │   ├── chunks.csv
+│   │   └── processing_report.txt
+│   ├── audio_file1_full_16k.flac      # Complete optimized file
+│   ├── audio_file1_chunk01_16k.flac   # Individual chunks
+│   └── audio_file1_chunk02_16k.flac
 └── audio_file2/
-    ├── split01.wav
+    ├── metadata/
+    ├── audio_file2_full_16k.flac
     └── ...
 ```
 
-## Development Notes
+## Enhanced CLI Features
 
-**Progress Reporting Improvements Needed**: The current implementation should be enhanced with better stdout feedback showing progress during:
-- Audio file loading and analysis phases
-- Silence detection processing (currently has basic progress bar)
-- Chunk filtering and validation steps
-- Export operations with file-by-file progress
-- Overall batch processing status across multiple files
-- Memory usage and processing speed metrics
+### Modern Interface with Typer
+The enhanced CLI (`audio_splitter_typer.py`) provides:
 
-Consider adding more granular progress indicators and ETA calculations for long-running operations.
+**Interactive Configuration**:
+- Step-by-step parameter setup with explanations
+- FLAC compression level selection (0-12)
+- Sample rate optimization for speech transcription
+- Visual configuration tables with Rich formatting
+
+**Subcommands**:
+- `process`: Main audio processing with FLAC optimization
+- `config`: Configuration management (show/create/edit)
+- `optimize`: Single file quick optimization
+- `analyze`: Audio file analysis without processing
+
+**User Experience**:
+- Beautiful Rich formatting with colors and progress bars
+- Type-safe configuration with Pydantic validation
+- Dry-run mode with size reduction predictions
+- Comprehensive help and usage examples
+
+### FLAC Optimization for Speech Transcription
+- **16kHz sample rate**: Optimal for speech intelligibility and LLM processing
+- **Mono conversion**: 50% size reduction without quality loss
+- **16-bit depth**: Quality preservation while minimizing file size
+- **Compression level 8**: Excellent compression without encoding overhead
+- **Size reduction**: Typical 90-95% reduction from original recordings
+
+### Configuration Management
+- YAML and JSON configuration file support
+- Interactive configuration with validation
+- Command-line parameter overrides
+- Clean configuration output without Python objects
