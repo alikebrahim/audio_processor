@@ -80,14 +80,14 @@ class AudioConfig(BaseModel):
         """Convert to format expected by audio_splitter"""
         return {
             "sample_rate": 22050,  # Processing sample rate
-            "target_sample_rate": self.target_sample_rate,
-            "flac_compression_level": self.flac_compression_level,
+            "target_sample_rate": self.target_sample_rate.value,
+            "flac_compression_level": self.flac_compression_level.value,
             "chunk_duration": self.chunk_duration,
             "silence_threshold": self.silence_threshold,
             "min_silence_duration": self.min_silence_duration,
             "min_chunk_duration": self.min_chunk_duration,
             "keep_silence": self.keep_silence,
-            "output_format": self.output_format,
+            "output_format": self.output_format.value,
             "create_metadata": self.create_metadata,
             "preserve_timestamps": self.preserve_timestamps
         }
@@ -113,7 +113,20 @@ def load_config(config_file: Optional[Path] = None) -> AudioConfig:
 def save_config(config: AudioConfig, config_file: Path):
     """Save configuration to file"""
     try:
-        config_data = config.model_dump()
+        # Convert to dict with proper values
+        config_data = {
+            "target_sample_rate": config.target_sample_rate.value,
+            "flac_compression_level": config.flac_compression_level.value,
+            "output_format": config.output_format.value,
+            "silence_threshold": config.silence_threshold,
+            "min_silence_duration": config.min_silence_duration,
+            "min_chunk_duration": config.min_chunk_duration,
+            "keep_silence": config.keep_silence,
+            "chunk_duration": config.chunk_duration,
+            "create_metadata": config.create_metadata,
+            "preserve_timestamps": config.preserve_timestamps
+        }
+        
         with open(config_file, 'w') as f:
             if config_file.suffix.lower() in ['.yaml', '.yml']:
                 yaml.dump(config_data, f, default_flow_style=False, indent=2)
@@ -133,17 +146,17 @@ def show_config_table(config: AudioConfig):
     # FLAC Optimization
     table.add_row(
         "Target Sample Rate", 
-        f"{config.target_sample_rate} Hz",
+        f"{config.target_sample_rate.value} Hz",
         "Optimal for speech transcription"
     )
     table.add_row(
         "FLAC Compression", 
-        f"Level {config.flac_compression_level}",
+        f"Level {config.flac_compression_level.value}",
         "Higher = smaller files, slower encoding"
     )
     table.add_row(
         "Output Format", 
-        config.output_format.upper(),
+        config.output_format.value.upper(),
         "Audio file format"
     )
     
@@ -337,9 +350,9 @@ def process(
         if format != OutputFormat.flac:
             config.output_format = format
         if sample_rate:
-            config.target_sample_rate = SampleRate(sample_rate)
+            config.target_sample_rate = sample_rate
         if compression is not None:
-            config.flac_compression_level = CompressionLevel(compression)
+            config.flac_compression_level = compression
     
     # Display header
     console.print("\n")
@@ -388,16 +401,16 @@ def process(
         for audio_file in audio_files:
             size_mb = audio_file.stat().st_size / (1024 * 1024)
             total_size += size_mb
-            output_name = f"{audio_file.stem}_full_16k.{config.output_format}"
+            output_name = f"{audio_file.stem}_full_16k.{config.output_format.value}"
             table.add_row(audio_file.name, f"{size_mb:.1f}MB", output_name)
         
         table.add_row("[bold]TOTAL[/bold]", f"[bold]{total_size:.1f}MB[/bold]", "", style="bold")
         console.print(table)
         
         console.print(f"\n📊 [bold]Processing Configuration:[/bold]")
-        console.print(f"   Target sample rate: {config.target_sample_rate} Hz")
-        console.print(f"   FLAC compression: Level {config.flac_compression_level}")
-        console.print(f"   Output format: {config.output_format.upper()}")
+        console.print(f"   Target sample rate: {config.target_sample_rate.value} Hz")
+        console.print(f"   FLAC compression: Level {config.flac_compression_level.value}")
+        console.print(f"   Output format: {config.output_format.value.upper()}")
         console.print(f"   Expected size reduction: ~90-95%")
         
         console.print(f"\n💡 Run without --dry-run to process files")
@@ -494,13 +507,13 @@ def optimize(
     console.print(f"\n⚡ [bold blue]Single File Optimization[/bold blue]")
     console.print(f"📁 Input: {input_file}")
     console.print(f"📁 Output: {output_file}")
-    console.print(f"🎵 Settings: {sample_rate}Hz, FLAC Level {compression}")
+    console.print(f"🎵 Settings: {sample_rate.value}Hz, FLAC Level {compression.value}")
     
     try:
         # Use the MultiFormatExporter directly
         exporter = MultiFormatExporter(
-            target_sample_rate=sample_rate,
-            flac_compression_level=compression
+            target_sample_rate=sample_rate.value,
+            flac_compression_level=compression.value
         )
         
         console.print(f"\n🔄 Converting...")
@@ -519,8 +532,8 @@ def optimize(
             table.add_row("Original Size", f"{original_size:.1f} MB")
             table.add_row("Optimized Size", f"{optimized_size:.1f} MB")
             table.add_row("Size Reduction", f"{reduction:.1f}%")
-            table.add_row("Sample Rate", f"{sample_rate} Hz")
-            table.add_row("Compression", f"FLAC Level {compression}")
+            table.add_row("Sample Rate", f"{sample_rate.value} Hz")
+            table.add_row("Compression", f"FLAC Level {compression.value}")
             
             console.print(table)
             console.print(f"\n✅ [bold green]Optimization completed![/bold green]")

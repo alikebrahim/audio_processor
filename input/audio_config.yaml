@@ -1,0 +1,10 @@
+chunk_duration: 30.0
+create_metadata: true
+flac_compression_level: 8
+keep_silence: 1.0
+min_chunk_duration: 5.0
+min_silence_duration: 25.0
+output_format: flac
+preserve_timestamps: true
+silence_threshold: 0.01
+target_sample_rate: 16000
