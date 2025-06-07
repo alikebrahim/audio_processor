@@ -30,14 +30,14 @@ This is an audio processing tool that splits monologue audio recordings (contain
 # Install dependencies
 uv sync
 
-# Enhanced CLI with Typer (recommended)
-uv run python audio_splitter_typer.py --help
-uv run python audio_splitter_typer.py process --interactive
-uv run python audio_splitter_typer.py optimize input.wav --output optimized.flac
+# Main CLI with Typer (recommended)
+uv run python audio_splitter_cli.py --help
+uv run python audio_splitter_cli.py process --interactive
+uv run python audio_splitter_cli.py optimize input.wav --output optimized.flac
 
-# Legacy interfaces
+# Alternative interfaces
 uv run python run.py                    # Simple batch processor
-uv run python audio_splitter_cli.py     # Argparse CLI
+uv run python main.py                   # Basic entry point
 ```
 
 ## Supported Audio Formats
@@ -65,12 +65,13 @@ Output: FLAC format (optimized for speech transcription)
 
 ## Processing Workflow
 
-1. **File Discovery**: Scan input directory for supported audio formats
-2. **Audio Loading**: Load files using PyDub with timing and size reporting
-3. **Silence Analysis**: Detect silence gaps using split_on_silence()
+1. **File Discovery**: Scan input directory for supported audio formats (excluding `input/processed/`)
+2. **Audio Loading**: Load files using Librosa with timing and size reporting
+3. **Silence Analysis**: Detect silence gaps using advanced signal processing
 4. **Chunk Filtering**: Remove chunks shorter than 5 seconds
 5. **FLAC Optimization**: Convert using FFmpeg to 16kHz, 16-bit, mono FLAC
 6. **Export**: Save optimized files with metadata in organized subdirectories
+7. **File Management**: Move successfully processed files to `input/processed/` (optional)
 
 ## Output Structure
 
@@ -93,7 +94,7 @@ output/
 ## Enhanced CLI Features
 
 ### Modern Interface with Typer
-The enhanced CLI (`audio_splitter_typer.py`) provides:
+The main CLI (`audio_splitter_cli.py`) provides:
 
 **Interactive Configuration**:
 - Step-by-step parameter setup with explanations
@@ -125,3 +126,14 @@ The enhanced CLI (`audio_splitter_typer.py`) provides:
 - Interactive configuration with validation
 - Command-line parameter overrides
 - Clean configuration output without Python objects
+
+## Important Processing Details
+
+### Chunk Count Reporting
+The session summary reports the number of audio chunks created, **excluding** the full optimized file. This provides an accurate count of the actual splits created from the original audio.
+
+### File Management
+- **Automatic Organization**: Successfully processed files are moved to `input/processed/` by default
+- **Clean Input Directory**: Subsequent runs automatically skip files in the `processed` subdirectory
+- **Disable Option**: Use `--no-move` flag to keep original files in place
+- **Safe Operation**: Files are only moved after successful processing to prevent data loss

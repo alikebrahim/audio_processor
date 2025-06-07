@@ -404,10 +404,10 @@ class OutputManager:
         
         if success:
             print(f"   ✅ Full file converted: {full_file_output.name}")
-            # Add full file to metadata
+            # Add full file to metadata (but don't count it in exported_count)
             total_duration = processing_stats.get("total_duration", 0)
             metadata.add_audio_chunk(0, 0.0, total_duration, full_file_output)
-            exported_count += 1
+            # Don't increment exported_count for the full file
         else:
             print(f"   ❌ Failed to convert full file")
         
@@ -449,7 +449,9 @@ class OutputManager:
         if self.create_metadata:
             self._save_metadata_files(file_output_dir, metadata)
         
-        return exported_count, metadata
+        # Return chunk count (excluding full file) and total exported count
+        chunk_count = exported_count - 1 if exported_count > 0 else 0
+        return chunk_count, metadata
     
     def _save_metadata_files(self, output_dir: Path, metadata: AudioMetadata):
         """Save various metadata files"""

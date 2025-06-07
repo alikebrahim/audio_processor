@@ -10,6 +10,7 @@ import sys
 import time
 import signal
 import threading
+import shutil
 from pathlib import Path
 from math import ceil
 from typing import List, Tuple, Optional, Callable, Dict, Any
@@ -208,16 +209,16 @@ class AudioProcessor:
                 return self._create_cancelled_result()
             
             # Stage 4: Export with Metadata
-            exported_count, metadata_report = self._export_chunks(
+            chunk_count, metadata_report = self._export_chunks(
                 input_file, audio_chunks, output_dir, progress, silence_segments
             )
             
             # Show final summary with metadata
-            progress.show_summary(exported_count, output_dir, metadata_report)
+            progress.show_summary(chunk_count, output_dir, metadata_report)
             
             return {
                 "success": True,
-                "chunks_created": exported_count,
+                "chunks_created": chunk_count,
                 "total_duration": progress.total_duration,
                 "filtered_duration": sum(end - start for start, end in audio_chunks),
                 "processing_time": time.time() - progress.start_time,
@@ -446,14 +447,14 @@ class AudioProcessor:
         }
         
         # Export with metadata
-        exported_count, metadata_report = export_with_metadata(
+        chunk_count, metadata_report = export_with_metadata(
             input_file, audio_chunks, output_dir, processing_config, 
             processing_stats, silence_segments
         )
         
-        print(f"   ✅ Exported {exported_count} chunks with metadata")
+        print(f"   ✅ Exported {chunk_count} chunks with metadata")
         
-        return exported_count, metadata_report
+        return chunk_count, metadata_report
     
     def _create_cancelled_result(self) -> Dict[str, Any]:
         """Create result for cancelled operation"""
@@ -472,7 +473,8 @@ def process_audio_files(input_dir: Path, output_dir: Path,
                                silence_threshold: float = 0.01,
                                min_silence_duration: float = 25.0,
                                create_metadata: bool = True,
-                               output_format: str = 'wav') -> None:
+                               output_format: str = 'wav',
+                               move_processed: bool = True) -> None:
     """
     Process all audio files with metadata and output options
     """
@@ -480,7 +482,15 @@ def process_audio_files(input_dir: Path, output_dir: Path,
     print(f"🔍 Scanning directory: {input_dir}")
     audio_extensions = {'.mp3', '.wav', '.m4a', '.flac', '.ogg', '.aac', '.mp4'}
     
-    all_files = list(input_dir.iterdir())
+    # Get all files, excluding the processed directory
+    all_files = []
+    for item in input_dir.iterdir():
+        if item.is_file():
+            all_files.append(item)
+        elif item.is_dir() and item.name != 'processed':
+            # Optionally scan subdirectories (excluding processed)
+            pass
+    
     audio_files = []
     total_size = 0
     
@@ -532,6 +542,12 @@ def process_audio_files(input_dir: Path, output_dir: Path,
     
     overall_start = time.time()
     
+    # Create processed directory if move_processed is enabled
+    processed_dir = input_dir / "processed"
+    if move_processed:
+        processed_dir.mkdir(exist_ok=True)
+        print(f"   📁 Processed files will be moved to: {processed_dir}")
+    
     # Process files with overall progress
     with tqdm(audio_files, desc="Overall Progress", unit="file") as file_pbar:
         for file_num, audio_file in enumerate(file_pbar, 1):
@@ -557,6 +573,15 @@ def process_audio_files(input_dir: Path, output_dir: Path,
                         "file": audio_file.name, 
                         "error": result.get("error", "Unknown error")
                     })
+            else:
+                # Move successfully processed file if enabled
+                if move_processed:
+                    try:
+                        dest_path = processed_dir / audio_file.name
+                        shutil.move(str(audio_file), str(dest_path))
+                        file_pbar.write(f"   ✅ Moved {audio_file.name} to processed/")
+                    except Exception as e:
+                        file_pbar.write(f"   ⚠️  Failed to move {audio_file.name}: {e}")
     
     # Stage 3: Final Summary
     total_session_time = time.time() - overall_start
