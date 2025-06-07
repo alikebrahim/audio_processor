@@ -245,6 +245,74 @@ class MultiFormatExporter:
             print(f"⚠️  Error exporting {output_file}: {e}")
             return False
     
+    def _export_flac_optimized(self, audio_data: np.ndarray, output_file: Path) -> bool:
+        """Export as optimized FLAC using FFmpeg (16kHz, 16-bit, mono)"""
+        try:
+            import subprocess
+            import tempfile
+            
+            # First save as temporary WAV at original sample rate
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_wav:
+                sf.write(temp_wav.name, audio_data, self.sample_rate)
+                
+                # Convert to optimized FLAC using FFmpeg
+                cmd = [
+                    'ffmpeg', 
+                    '-i', temp_wav.name,
+                    '-ar', str(self.target_sample_rate),  # Resample to 16kHz
+                    '-ac', '1',                           # Convert to mono
+                    '-c:a', 'flac',                       # Use FLAC codec
+                    '-compression_level', str(self.flac_compression_level),  # Compression level 8
+                    '-sample_fmt', 's16',                 # 16-bit sample format
+                    '-y',                                 # Overwrite output file
+                    str(output_file)
+                ]
+                
+                result = subprocess.run(cmd, capture_output=True, text=True)
+                
+                # Clean up temp file
+                Path(temp_wav.name).unlink()
+                
+                if result.returncode != 0:
+                    print(f"⚠️  FFmpeg FLAC conversion failed: {result.stderr}")
+                    return False
+                
+                return True
+                
+        except Exception as e:
+            print(f"⚠️  Optimized FLAC export failed: {e}")
+            return False
+    
+    def export_full_file_flac(self, input_file: Path, output_file: Path) -> bool:
+        """Export full audio file as optimized FLAC directly using FFmpeg"""
+        try:
+            import subprocess
+            
+            # Convert full file to optimized FLAC using FFmpeg
+            cmd = [
+                'ffmpeg', 
+                '-i', str(input_file),
+                '-ar', str(self.target_sample_rate),  # Resample to 16kHz
+                '-ac', '1',                           # Convert to mono
+                '-c:a', 'flac',                       # Use FLAC codec
+                '-compression_level', str(self.flac_compression_level),  # Compression level 8
+                '-sample_fmt', 's16',                 # 16-bit sample format
+                '-y',                                 # Overwrite output file
+                str(output_file)
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                print(f"⚠️  FFmpeg full file FLAC conversion failed: {result.stderr}")
+                return False
+            
+            return True
+            
+        except Exception as e:
+            print(f"⚠️  Full file FLAC export failed: {e}")
+            return False
+    
     def _export_mp3(self, audio_data: np.ndarray, output_file: Path, quality: str) -> bool:
         """Export as MP3 using FFmpeg"""
         try:
@@ -284,12 +352,18 @@ class OutputManager:
     """Manage output with metadata and multiple formats"""
     
     def __init__(self, output_dir: Path, create_metadata: bool = True, 
-                 output_format: str = 'wav', preserve_timestamps: bool = True):
+                 output_format: str = 'wav', preserve_timestamps: bool = True,
+                 target_sample_rate: int = 16000, flac_compression_level: int = 8):
         self.output_dir = output_dir
         self.create_metadata = create_metadata
         self.output_format = output_format
         self.preserve_timestamps = preserve_timestamps
-        self.exporter = MultiFormatExporter()
+        self.target_sample_rate = target_sample_rate
+        self.flac_compression_level = flac_compression_level
+        self.exporter = MultiFormatExporter(
+            target_sample_rate=target_sample_rate,
+            flac_compression_level=flac_compression_level
+        )
         
     def create_output_structure(self, source_file: Path) -> Path:
         """Create organized output directory structure"""
@@ -312,34 +386,61 @@ class OutputManager:
         
         exported_count = 0
         
-        # Export audio chunks
-        for i, (start, end) in enumerate(audio_chunks, 1):
-            try:
-                # Load audio segment
-                y, sr = librosa.load(str(source_file), sr=self.exporter.sample_rate, 
-                                   offset=start, duration=end-start)
-                
-                # Determine output filename
-                format_ext = MultiFormatExporter.SUPPORTED_FORMATS[self.output_format]['ext']
-                output_file = file_output_dir / f"split{i:02d}{format_ext}"
-                
-                # Export in specified format
-                if self.exporter.export_chunk(y, output_file, self.output_format):
-                    exported_count += 1
-                    metadata.add_audio_chunk(i, start, end, output_file)
-                    
-                    # Preserve timestamps if requested
-                    if self.preserve_timestamps and output_file.exists():
-                        source_mtime = source_file.stat().st_mtime
-                        import os
-                        os.utime(str(output_file), (source_mtime, source_mtime))
-                
-            except Exception as e:
-                print(f"   ⚠️  Error exporting chunk {i}: {e}")
-                continue
+        # Always export full original file first
+        format_ext = MultiFormatExporter.SUPPORTED_FORMATS[self.output_format]['ext']
+        full_file_output = file_output_dir / f"{source_file.stem}_full_16k{format_ext}"
         
-        # Add silence segments to metadata
-        # This would be populated during silence detection
+        print(f"   🎵 Converting full file to optimized {self.output_format.upper()}...")
+        if self.output_format == 'flac':
+            success = self.exporter.export_full_file_flac(source_file, full_file_output)
+        else:
+            # For other formats, use the chunk export method but load the whole file
+            try:
+                y, sr = librosa.load(str(source_file), sr=self.exporter.sample_rate)
+                success = self.exporter.export_chunk(y, full_file_output, self.output_format)
+            except Exception as e:
+                print(f"   ⚠️  Error loading full file: {e}")
+                success = False
+        
+        if success:
+            print(f"   ✅ Full file converted: {full_file_output.name}")
+            # Add full file to metadata
+            total_duration = processing_stats.get("total_duration", 0)
+            metadata.add_audio_chunk(0, 0.0, total_duration, full_file_output)
+            exported_count += 1
+        else:
+            print(f"   ❌ Failed to convert full file")
+        
+        # Export audio chunks if any exist
+        if audio_chunks:
+            print(f"   🔪 Converting {len(audio_chunks)} chunks to optimized {self.output_format.upper()}...")
+            for i, (start, end) in enumerate(audio_chunks, 1):
+                try:
+                    # Load audio segment
+                    y, sr = librosa.load(str(source_file), sr=self.exporter.sample_rate, 
+                                       offset=start, duration=end-start)
+                    
+                    # Determine output filename with optimized naming
+                    output_file = file_output_dir / f"{source_file.stem}_chunk{i:02d}_16k{format_ext}"
+                    
+                    # Export in specified format
+                    if self.exporter.export_chunk(y, output_file, self.output_format):
+                        exported_count += 1
+                        metadata.add_audio_chunk(i, start, end, output_file)
+                        
+                        # Preserve timestamps if requested
+                        if self.preserve_timestamps and output_file.exists():
+                            source_mtime = source_file.stat().st_mtime
+                            import os
+                            os.utime(str(output_file), (source_mtime, source_mtime))
+                    
+                except Exception as e:
+                    print(f"   ⚠️  Error exporting chunk {i}: {e}")
+                    continue
+            
+            print(f"   ✅ Exported {exported_count-1} chunks successfully")
+        else:
+            print(f"   ℹ️  No chunks found - only full file converted")
         
         # Set processing statistics
         metadata.set_processing_stats(processing_stats)
@@ -396,12 +497,14 @@ def export_with_metadata(source_file: Path, audio_chunks: List[Tuple[float, floa
                                  silence_segments: List[Tuple[float, float]]) -> Tuple[int, str]:
     """Export chunks with metadata and return summary"""
     
-    # Create output manager
+    # Create output manager with optimized FLAC settings
     output_manager = OutputManager(
         output_dir=output_dir,
         create_metadata=processing_config.get("create_metadata", True),
-        output_format=processing_config.get("output_format", "wav"),
-        preserve_timestamps=processing_config.get("preserve_timestamps", True)
+        output_format=processing_config.get("output_format", "flac"),
+        preserve_timestamps=processing_config.get("preserve_timestamps", True),
+        target_sample_rate=16000,
+        flac_compression_level=8
     )
     
     # Export chunks with metadata
