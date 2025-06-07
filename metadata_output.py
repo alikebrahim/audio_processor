@@ -411,8 +411,12 @@ class OutputManager:
         else:
             print(f"   ❌ Failed to convert full file")
         
-        # Export audio chunks if any exist
-        if audio_chunks:
+        # Export audio chunks only if there are multiple chunks (actual splitting occurred)
+        if audio_chunks and len(audio_chunks) > 1:
+            # Create chunks subdirectory
+            chunks_dir = file_output_dir / "chunks"
+            chunks_dir.mkdir(exist_ok=True)
+            
             print(f"   🔪 Converting {len(audio_chunks)} chunks to optimized {self.output_format.upper()}...")
             for i, (start, end) in enumerate(audio_chunks, 1):
                 try:
@@ -420,8 +424,8 @@ class OutputManager:
                     y, sr = librosa.load(str(source_file), sr=self.exporter.sample_rate, 
                                        offset=start, duration=end-start)
                     
-                    # Determine output filename with optimized naming
-                    output_file = file_output_dir / f"{source_file.stem}_chunk{i:02d}_16k{format_ext}"
+                    # Place chunk files in chunks/ subdirectory
+                    output_file = chunks_dir / f"{source_file.stem}_chunk{i:02d}_16k{format_ext}"
                     
                     # Export in specified format
                     if self.exporter.export_chunk(y, output_file, self.output_format):
@@ -438,9 +442,9 @@ class OutputManager:
                     print(f"   ⚠️  Error exporting chunk {i}: {e}")
                     continue
             
-            print(f"   ✅ Exported {exported_count-1} chunks successfully")
+            print(f"   ✅ Exported {exported_count} chunks successfully")
         else:
-            print(f"   ℹ️  No chunks found - only full file converted")
+            print(f"   ℹ️  No splitting occurred - only full file converted")
         
         # Set processing statistics
         metadata.set_processing_stats(processing_stats)
@@ -449,9 +453,8 @@ class OutputManager:
         if self.create_metadata:
             self._save_metadata_files(file_output_dir, metadata)
         
-        # Return chunk count (excluding full file) and total exported count
-        chunk_count = exported_count - 1 if exported_count > 0 else 0
-        return chunk_count, metadata
+        # Return actual chunk count (only individual split chunks, not full file)
+        return exported_count, metadata
     
     def _save_metadata_files(self, output_dir: Path, metadata: AudioMetadata):
         """Save various metadata files"""

@@ -137,3 +137,11 @@ The session summary reports the number of audio chunks created, **excluding** th
 - **Clean Input Directory**: Subsequent runs automatically skip files in the `processed` subdirectory
 - **Disable Option**: Use `--no-move` flag to keep original files in place
 - **Safe Operation**: Files are only moved after successful processing to prevent data loss
+
+## Git Strategy
+
+When committing changes:
+- Do not include Claude signature or "Generated with Claude Code" attribution
+- Write concise, descriptive commit messages that explain the work done
+- Focus on what was changed and why, keeping messages reasonably brief
+- Follow the project's existing commit message style and conventions

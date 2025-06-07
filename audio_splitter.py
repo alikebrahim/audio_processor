@@ -401,16 +401,20 @@ class AudioProcessor:
             if total_duration - chunk_start >= self.min_chunk_duration:
                 audio_chunks.append((chunk_start, total_duration))
         else:
-            # No silence found - single chunk
+            # No silence found - treat as single file (no splitting needed)
+            print(f"   ℹ️  No silence >= {self.min_silence_duration}s detected - file will be processed as single chunk")
             audio_chunks = [(0.0, total_duration)]
         
         # Filter chunks by minimum duration
         valid_chunks = [(start, end) for start, end in audio_chunks 
                        if end - start >= self.min_chunk_duration]
         
-        print(f"   ✓ Created {len(valid_chunks)} audio chunks")
-        for i, (start, end) in enumerate(valid_chunks, 1):
-            print(f"      Chunk {i}: {start/60:.1f}m - {end/60:.1f}m ({(end-start)/60:.1f}m)")
+        if len(valid_chunks) > 1:
+            print(f"   ✓ Audio will be split into {len(valid_chunks)} chunks")
+            for i, (start, end) in enumerate(valid_chunks, 1):
+                print(f"      Chunk {i}: {start/60:.1f}m - {end/60:.1f}m ({(end-start)/60:.1f}m)")
+        else:
+            print(f"   ✓ Audio processed as single file (no chunking needed)")
         
         return valid_chunks
     
